@@ -1,0 +1,70 @@
+import threading
+import time
+import socket
+# def h(time):
+#     while True:
+#         print(f"фоновая задача работает")
+#         time.sleep(1)
+# t = threading.Thread(target=h,daemon=True)
+# t.start()
+# print(f"Основная программа завершается через 3 секунды")
+# time.sleep(3)
+    
+clients = []
+lock = threading.Lock()
+
+def otpraka(message, sender_socket=None):
+    with lock:
+        for client in clients:
+            if client != sender_socket:
+                try:
+                    client.send(message.encode('utf-8'))
+                except:
+                    pass
+
+
+
+def ss(client_socket,client_address):
+    print(f"подключился клиент {client_address}")
+    client_socket.send("Добро пожаловать в чат!".encode('utf-8'))
+    otpraka(f"Клиент {client_address} присоединился к чату", client_socket)
+    while True:
+        try:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+            message = data.decode("utf-8")
+            print(f"клиент {client_address}: отправил сообщение: {message}")
+            otpraka(f"{client_address}: {message}", client_socket)
+        except ConnectionResetError:
+            print("Пользователь на вас обиделся и вышел")
+            break
+        except:
+            break
+    with lock:
+        if client_socket in clients:
+            clients.remove(client_socket)
+    try:
+        client_socket.close()
+    except:
+        pass
+    try:
+        print(f"клиент {client_address} отключился")
+        otpraka(f"Пользователь {client_address} отключился", client_socket)
+    except:
+        pass
+
+
+
+server_socket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
+server_socket.bind(("127.0.0.1", 5000))
+server_socket.listen()
+print("Сервер запущен и ждет")
+
+while True:
+    client_socket, client_address=server_socket.accept()
+    with lock:
+        clients.append(client_socket)
+    t = threading.Thread(target=ss,args=(client_socket,client_address), daemon=True).start()
+
